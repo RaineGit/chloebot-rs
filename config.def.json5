@@ -1,0 +1,10 @@
+{
+	// Default prefix
+	prefix: "d?",
+	// Command categories (case sensitive)
+	categories: ["Misc"],
+	// Default embed color
+	embed_color: 0xE6CB67, // Yellow
+	// Error embed color
+	bad_color: 0xFF8080, // Red
+}
