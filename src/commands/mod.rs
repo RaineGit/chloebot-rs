@@ -20,22 +20,22 @@ macro_rules! func {
 
 macro_rules! error {
 	($a:expr,$b:expr) => {
-		Err(CommErr::Error($a.to_string(), $b.to_string()))
+		CommErr::Error($a.to_string(), $b.to_string())
 	};
 	($a:expr) => {
-		Err(CommErr::Error($a.to_string(), String::new()))
+		CommErr::Error($a.to_string(), String::new())
 	};
 	(,$b:expr) => {
-		Err(CommErr::Error(String::new(), $b.to_string()))
+		CommErr::Error(String::new(), $b.to_string())
 	};
 	() => {
-		Err(CommErr::UnknownError)
+		CommErr::UnknownError
 	}
 }
 
 macro_rules! syntax_error {
 	() => {
-		Err(CommErr::SyntaxError)
+		CommErr::SyntaxError
 	}
 }
 
@@ -43,13 +43,13 @@ macro_rules! handle {
 	($a:expr,$b:expr) => {
 		match $a {
 			Ok(v) => v,
-			Err(e) => return error!($b, format!("{e}"))
+			Err(e) => return Err(error!($b, format!("{e}")))
 		}
 	};
 	($a:expr) => {
 		match $a {
 			Ok(v) => v,
-			Err(e) => return error!(, format!("{e}"))
+			Err(e) => return Err(error!(, format!("{e}")))
 		}
 	};
 }
@@ -59,13 +59,13 @@ macro_rules! handle_opt {
 	($a:expr,$b:expr) => {
 		match $a {
 			Some(v) => v,
-			None => return error!($b)
+			None => return Err(error!($b))
 		}
 	};
 	($a:expr) => {
 		match $a {
 			Some(v) => v,
-			None => return error!()
+			None => return Err(error!())
 		}
 	};
 }
@@ -74,7 +74,7 @@ macro_rules! handle_syntax_opt {
 	($a:expr) => {
 		match $a {
 			Some(v) => v,
-			None => return syntax_error!()
+			None => return Err(syntax_error!())
 		}
 	};
 }

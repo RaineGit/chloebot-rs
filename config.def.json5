@@ -1,6 +1,8 @@
 {
 	// Default prefix
 	prefix: "d?",
+	// Bot invite link
+	invite: "https://discord.com/oauth2/authorize?client_id=XXXXXXXXXXX&permissions=XXXXXXXXXXX&scope=bot%20applications.commands",
 	// Command categories (case sensitive)
 	categories: ["Misc"],
 	// Default embed color

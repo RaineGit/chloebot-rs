@@ -93,6 +93,21 @@ pub fn commands<'a>() -> Vec<Command<'a>> {
 			}),
 			..Command::new()
 		},
+		// invite
+		Command {
+			names: svec!["invite"],
+			desc: "Invite me to other servers".to_string(),
+			options: Vec::new(),
+			cat: category.clone(),
+			func: |_params: CommandParams| func!({
+				match &CHLOE.config["invite"] {
+					Value::String(invite) => Ok(CommRes::Text(format!("Thank you!\n{}", invite))),
+					Value::Null => Err(error!(, "The entry \"invite\" doesn't exist in the config")),
+					_ => Err(error!(, "The entry \"invite\" in the config must be a string"))
+				}
+			}),
+			..Command::new()
+		},
 		// say
 		Command {
 			names: svec!["say"],
@@ -119,7 +134,7 @@ pub fn commands<'a>() -> Vec<Command<'a>> {
 			cat: category.clone(),
 			func: |params: CommandParams| func!({
 				let text = handle_syntax_opt!(params.get_option_string("text"));
-				error!(text)
+				Err(error!(text))
 			}),
 			..Command::new()
 		}
