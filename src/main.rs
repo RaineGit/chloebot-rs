@@ -14,7 +14,7 @@ pub mod core;
 use crate::core::*;
 
 lazy_static! {
-    pub static ref CHLOE: ChloeManager<'static> = ChloeManager::new(
+	pub static ref CHLOE: ChloeManager<'static> = ChloeManager::new(
 		Some("config.json5"),
 		commands::commands()
 	).unwrap();
@@ -96,15 +96,15 @@ impl EventHandler for Handler {
 
 	async fn ready(&self, ctx: Context, ready: Ready) {
 		let commands = &CHLOE.commands;
-        serenity::model::application::command::Command::set_global_application_commands(&ctx.http, |new_commands| {
+		serenity::model::application::command::Command::set_global_application_commands(&ctx.http, |new_commands| {
 			for command in commands.iter() {
 				new_commands.create_application_command(|new_command| {
-                    new_command.name(command.names[0].clone()).description(command.desc.clone());
+					new_command.name(command.names[0].clone()).description(command.desc.clone());
 					for option in command.options.iter() {
 						new_command.create_option(option);
 					}
 					new_command
-                });
+				});
 			}
 			new_commands
 		}).await.unwrap();
@@ -118,7 +118,7 @@ async fn main() {
 		let _ = &CHLOE.config;
 		let _ = DB.clone();
 	}
-	let token = env::var("DISCORD_TOKEN").expect("Expected a token in the environment");
+	let token = env::var("DISCORD_TOKEN").expect("Expected a discord token in the environment variable DISCORD_TOKEN");
 
 	let intents = GatewayIntents::GUILD_MESSAGES
 		| GatewayIntents::DIRECT_MESSAGES

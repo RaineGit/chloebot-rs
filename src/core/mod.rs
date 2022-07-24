@@ -286,11 +286,11 @@ pub fn parse_config_file(config_path_str: &str) -> Result<Value, String> {
 						return Err(format!("{e}.         The example config file \"{def_config_path_str}\" might come in handy"));
 					}
 					else {
-						println!("The config file \"{config_path_str}\" doesn't exist, I will attempt to copy the example config file \"{def_config_path_str}\" to \"{config_path_str}\".");
+						println!("The config file \"{config_path_str}\" doesn't exist. I will attempt to copy the example config file \"{def_config_path_str}\" to \"{config_path_str}\".");
 						if let Err(e) = fs::copy(def_config_path_str, config_path_str) {
 							return Err(format!("Unable to copy \"{def_config_path_str}\" to \"{config_path_str}\": {e}"));
 						}
-						println!("Done, consider modifying the config file \"{config_path_str}\" as you please.");
+						println!("Done. You can modify the config file \"{config_path_str}\" as you like.");
 						return parse_config_file(config_path_str);
 					}
 				}
