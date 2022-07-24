@@ -103,10 +103,7 @@ pub fn commands<'a>() -> Vec<Command<'a>> {
 			}],
 			cat: category.clone(),
 			func: |params: CommandParams| func!({
-				let text = match handle_opt!(&handle_syntax_opt!(params.options.get("text")).resolved) {
-					CommandDataOptionValue::String(v) => v.clone(),
-					_ => String::new()
-				};
+				let text = handle_syntax_opt!(params.get_option_string("text"));
 				Ok(CommRes::Text(text))
 			}),
 			..Command::new()
@@ -121,10 +118,7 @@ pub fn commands<'a>() -> Vec<Command<'a>> {
 			}],
 			cat: category.clone(),
 			func: |params: CommandParams| func!({
-				let text = match handle_opt!(&handle_syntax_opt!(params.options.get("text")).resolved) {
-					CommandDataOptionValue::String(v) => v.clone(),
-					_ => String::new()
-				};
+				let text = handle_syntax_opt!(params.get_option_string("text"));
 				error!(text)
 			}),
 			..Command::new()

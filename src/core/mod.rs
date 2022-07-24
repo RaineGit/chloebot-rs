@@ -65,6 +65,24 @@ pub struct CommandParams {
 }
 
 impl CommandParams {
+	pub fn get_option(&self, name: &str) -> Option<&CommandDataOptionValue> {
+		match self.options.get(name) {
+			Some(v) => match &v.resolved {
+				Some(v) => Some(v),
+				None => None
+			},
+			None => None
+		}
+	}
+	pub fn get_option_string(&self, name: &str) -> Option<String> {
+		match self.get_option(name) {
+			Some(v) => match v {
+				CommandDataOptionValue::String(v) => Some(v.clone()),
+				_ => None
+			},
+			None => None
+		}
+	}
 	/// doir stands for "delete original interaction response"
 	pub async fn doir(&self) {
 		if let Some(inter) = &self.inter {
@@ -169,49 +187,10 @@ impl<'a> ChloeManager<'a> {
 		}
 	}
 	pub async fn run_command(&self, name: &str, params: CommandParams) -> Option<Result<CommRes, CommErr>> {
-		return Some(match self.command(name) {
-			Some(command) => {
-				let prefix = params.prefix.clone();
-				let prefix = prefix.as_str();
-				match command.run(params).await {
-					Ok(v) => Ok(v),
-					Err(e) => Ok(CommRes::Msg(make_message(|m| {
-						match e {
-							CommErr::Error(e1, e2) => {
-								if !e2.is_empty() {
-									eprintln!("Error processing message: {}", e2);
-								}
-								m.add_embed(|e| {
-									let e = e.title("Error")
-									.color(CHLOE.config["bad_color"].as_i64().unwrap() as i32);
-									if e1.is_empty() {
-										e.description("An error has occurred")
-									}
-									else {
-										e.description(e1)
-									}
-								})
-							},
-							CommErr::UnknownError => m.add_embed(|e| {
-								e.title("Error")
-								.color(CHLOE.config["bad_color"].as_i64().unwrap() as i32)
-								.description("An error has occurred")
-							}),
-							CommErr::SyntaxError => {
-								m.add_embed(|e| {
-									e.title(format!("{}{}", prefix, command.names[0]))
-									.description(command.desc.clone())
-									.fields(vec![("Syntax", format!("{}{} {}", prefix, command.names[0], command.args), false)])
-									.color(CHLOE.config["embed_color"].as_i64().unwrap() as i32)
-								})
-							},
-							CommErr::UnknownCommand => m.content("Unknown command")
-						}
-					})))
-				}
-			},
-			None => Err(CommErr::UnknownCommand)
-		});
+		match self.command(name) {
+			Some(command) => Some(command.run(params).await),
+			None => None
+		}
 	}
 	pub async fn process_msg(&self, msg: Message, ctx: serenity::client::Context, db: Arc<Mutex<Database>>, prefix: &str) -> Option<Result<(), CommErr>> {
 		if let Some(arg_str) = msg.content.clone().strip_prefix(prefix) {
@@ -236,7 +215,7 @@ impl<'a> ChloeManager<'a> {
 				inter: None,
 				author: author,
 				member: member,
-				channel_id: channel_id,
+				channel_id: channel_id.clone(),
 				guild_id: guild_id
 			}).await {
 				Some(v) => Some(match v {
@@ -245,19 +224,144 @@ impl<'a> ChloeManager<'a> {
 							Ok(..) => Ok(()),
 							Err(e) => Err(CommErr::Error(String::new(), format!("{e}")))
 						},
-						CommRes::Msg(msg) => match channel_id.send_message(ctx.http, |m| { *m = msg; m }).await {
+						CommRes::Msg(msg) => match channel_id.send_message(ctx.http.as_ref(), |m| { *m = msg; m }).await {
 							Ok(..) => Ok(()),
 							Err(e) => Err(CommErr::Error(String::new(), format!("{e}")))
 						},
 						_ => Ok(())
 					},
-					Err(e) => Err(e)
+					Err(e) => {
+						channel_id.send_message(ctx.http.as_ref(), |m| {
+							let command = self.command(args[0]).unwrap();
+							match &e {
+								CommErr::Error(e1, e2) => {
+									if !e2.is_empty() {
+										eprintln!("Error processing message: {}", e2);
+									}
+									m.add_embed(|e| {
+										let e = e.title("Error")
+										.color(CHLOE.config["bad_color"].as_i64().unwrap() as i32);
+										if e1.is_empty() {
+											e.description("An error has occurred")
+										}
+										else {
+											e.description(e1)
+										}
+									})
+								},
+								CommErr::UnknownError => m.add_embed(|e| {
+									e.title("Error")
+									.color(CHLOE.config["bad_color"].as_i64().unwrap() as i32)
+									.description("An error has occurred")
+								}),
+								CommErr::SyntaxError => 
+									m.add_embed(|e| {
+									e.title(format!("{}{}", prefix, command.names[0]))
+									.description(command.desc.clone())
+									.fields(vec![("Syntax", format!("{}{} {}", prefix, command.names[0], command.args), false)])
+									.color(CHLOE.config["embed_color"].as_i64().unwrap() as i32)
+								}),
+								CommErr::UnknownCommand => m.content("Unknown command")
+							}
+						}).await.ok();
+						Err(e)
+					}
 				}),
-				None => None
+				None => {
+					channel_id.say(ctx.http.as_ref(), "Unknown command").await.ok();
+					None
+				}
 			}
 		}
 		else {
 			None
+		}
+	}
+	pub async fn process_inter(&self, inter: ApplicationCommandInteraction, ctx: serenity::client::Context, db: Arc<Mutex<Database>>) -> Option<Result<(), CommErr>> {
+		inter.defer(ctx.http.as_ref()).await.unwrap();
+		let member = match inter.member {
+			Some(..) => {
+				inter.guild_id.clone().unwrap().member(ctx.http.as_ref(), inter.user.id).await.ok()
+			},
+			None => None
+		};
+		let author = inter.user.clone();
+		let channel_id = inter.channel_id.clone();
+		let guild_id = inter.guild_id.clone();
+		match CHLOE.run_command(inter.data.name.clone().as_str(), CommandParams {
+			args: Vec::new(),
+			arg_string: String::new(),
+			prefix: "/".to_string(),
+			db: db,
+			ctx: ctx.clone(),
+			options: CommOptions::new(inter.data.options.clone()).0,
+			msg: None,
+			inter: Some(inter.clone()),
+			author: author,
+			member: member,
+			channel_id: channel_id,
+			guild_id: guild_id
+		}).await {
+			Some(v) => Some(match v {
+				Ok(v) => {
+					match v {
+						CommRes::Text(text) => match inter.create_followup_message(ctx.http.as_ref(), |m| { m.content(text) }).await {
+							Ok(..) => Ok(()),
+							Err(e) => Err(CommErr::Error(String::new(), format!("{e}")))
+						},
+						CommRes::Msg(msg) => match inter.create_followup_message(ctx.http.as_ref(), |m| { *m = CreateInteractionResponseFollowup(msg.0, msg.2); m }).await {
+							Ok(..) => Ok(()),
+							Err(e) => Err(CommErr::Error(String::new(), format!("{e}")))
+						},
+						CommRes::None => {
+							Ok(())
+						}
+					}
+				},
+				Err(e) => {
+						inter.create_followup_message(ctx.http.as_ref(), |m| {
+							let prefix = "/";
+							let command = self.command(inter.data.name.clone().as_str()).unwrap();
+							match &e {
+								CommErr::Error(e1, e2) => {
+									if !e2.is_empty() {
+										eprintln!("Error processing message: {}", e2);
+									}
+									m.embed(|e| {
+										let e = e.title("Error")
+										.color(CHLOE.config["bad_color"].as_i64().unwrap() as i32);
+										if e1.is_empty() {
+											e.description("An error has occurred")
+										}
+										else {
+											e.description(e1)
+										}
+									})
+								},
+								CommErr::UnknownError => m.embed(|e| {
+									e.title("Error")
+									.color(CHLOE.config["bad_color"].as_i64().unwrap() as i32)
+									.description("An error has occurred")
+								}),
+								CommErr::SyntaxError => 
+									m.embed(|e| {
+									e.title(format!("{}{}", prefix, command.names[0]))
+									.description(command.desc.clone())
+									.fields(vec![("Syntax", format!("{}{} {}", prefix, command.names[0], command.args), false)])
+									.color(CHLOE.config["embed_color"].as_i64().unwrap() as i32)
+								}),
+								CommErr::UnknownCommand => m.content("Unknown command")
+							}
+						}).await.ok();
+						Err(e)
+					}
+			}),
+			None => {
+				inter.create_followup_message(ctx.http.as_ref(), |m| {
+					m.content("Unknown command")
+				}).await.ok();
+				None
+			}
 		}
 	}
 }

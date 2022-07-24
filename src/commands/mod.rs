@@ -8,7 +8,6 @@ use serenity::builder::{CreateComponents, CreateActionRow, CreateButton};
 use serenity::model::application::interaction::InteractionResponseType;
 use serenity::builder::CreateApplicationCommandOption;
 use serenity::model::application::command::CommandOptionType;
-use serenity::model::prelude::interaction::application_command::CommandDataOptionValue;
 use serenity::model::application::component::ButtonStyle;
 
 macro_rules! func {
@@ -55,6 +54,7 @@ macro_rules! handle {
 	};
 }
 
+#[allow(unused_macros)]
 macro_rules! handle_opt {
 	($a:expr,$b:expr) => {
 		match $a {
