@@ -11,6 +11,8 @@ use serde_json::Value;
 use serenity::builder::{CreateMessage, CreateComponents, CreateApplicationCommandOption, CreateInteractionResponseFollowup};
 use serenity::model::channel::Message;
 use serenity::model::guild::Member;
+use serenity::model::user::User;
+use serenity::model::prelude::{Role, Attachment, PartialMember, PartialChannel};
 use serenity::model::prelude::command::CommandOptionType;
 use serenity::model::application::interaction::application_command::{ApplicationCommandInteraction, CommandDataOption, CommandDataOptionValue};
 use super::CHLOE;
@@ -19,7 +21,7 @@ pub struct CommOption {
 	pub name: String,
 	pub value: Option<Value>,
 	pub kind: CommandOptionType,
-	pub options: HashMap<String, CommOption>,
+	pub options: CommOptions,
 	pub resolved: Option<CommandDataOptionValue>,
 	pub focused: bool
 }
@@ -30,7 +32,7 @@ impl CommOption {
 			name: option.name,
 			value: option.value,
 			kind: option.kind,
-			options: CommOptions::new(option.options).0,
+			options: CommOptions::new(option.options),
 			resolved: option.resolved,
 			focused: option.focused
 		}
@@ -47,15 +49,100 @@ impl CommOptions {
 		}
 		Self(new_options)
 	}
+	pub fn get(&self, name: &str) -> Option<&CommandDataOptionValue> {
+		match self.0.get(name) {
+			Some(v) => match &v.resolved {
+				Some(v) => Some(v),
+				None => None
+			},
+			None => None
+		}
+	}
+	pub fn get_string(&self, name: &str) -> Option<String> {
+		match self.get(name) {
+			Some(v) => match v {
+				CommandDataOptionValue::String(v) => Some(v.clone()),
+				_ => None
+			},
+			None => None
+		}
+	}
+	pub fn get_int(&self, name: &str) -> Option<i64> {
+		match self.get(name) {
+			Some(v) => match v {
+				CommandDataOptionValue::Integer(v) => Some(*v),
+				_ => None
+			},
+			None => None
+		}
+	}
+	pub fn get_number(&self, name: &str) -> Option<f64> {
+		match self.get(name) {
+			Some(v) => match v {
+				CommandDataOptionValue::Number(v) => Some(*v),
+				_ => None
+			},
+			None => None
+		}
+	}
+	pub fn get_bool(&self, name: &str) -> Option<bool> {
+		match self.get(name) {
+			Some(v) => match v {
+				CommandDataOptionValue::Boolean(v) => Some(*v),
+				_ => None
+			},
+			None => None
+		}
+	}
+	pub fn get_user(&self, name: &str) -> Option<(&User, Option<&PartialMember>)> {
+		match self.get(name) {
+			Some(v) => match v {
+				CommandDataOptionValue::User(v0, v1) => Some((v0, v1.as_ref())),
+				_ => None
+			},
+			None => None
+		}
+	}
+	pub fn get_channel(&self, name: &str) -> Option<&PartialChannel> {
+		match self.get(name) {
+			Some(v) => match v {
+				CommandDataOptionValue::Channel(v) => Some(v),
+				_ => None
+			},
+			None => None
+		}
+	}
+	pub fn get_role(&self, name: &str) -> Option<&Role> {
+		match self.get(name) {
+			Some(v) => match v {
+				CommandDataOptionValue::Role(v) => Some(v),
+				_ => None
+			},
+			None => None
+		}
+	}
+	pub fn get_attachment(&self, name: &str) -> Option<&Attachment> {
+		match self.get(name) {
+			Some(v) => match v {
+				CommandDataOptionValue::Attachment(v) => Some(v),
+				_ => None
+			},
+			None => None
+		}
+	}
+	pub fn get_options(&self, name: &str) -> Option<&CommOptions> {
+		match self.0.get(name) {
+			Some(v) => Some(&v.options),
+			None => None
+		}
+	}
 }
 
 pub struct CommandParams {
-	pub args: Vec<String>,
-	pub arg_string: String,
 	pub prefix: String,
 	pub db: Arc<Mutex<Database>>,
 	pub ctx: serenity::client::Context,
-	pub options: HashMap<String, CommOption>,
+	pub options: CommOptions,
 	pub msg: Option<Message>,
 	pub inter: Option<ApplicationCommandInteraction>,
 	pub author: serenity::model::user::User,
@@ -65,24 +152,6 @@ pub struct CommandParams {
 }
 
 impl CommandParams {
-	pub fn get_option(&self, name: &str) -> Option<&CommandDataOptionValue> {
-		match self.options.get(name) {
-			Some(v) => match &v.resolved {
-				Some(v) => Some(v),
-				None => None
-			},
-			None => None
-		}
-	}
-	pub fn get_option_string(&self, name: &str) -> Option<String> {
-		match self.get_option(name) {
-			Some(v) => match v {
-				CommandDataOptionValue::String(v) => Some(v.clone()),
-				_ => None
-			},
-			None => None
-		}
-	}
 	/// doir stands for "delete original interaction response"
 	pub async fn doir(&self) {
 		if let Some(inter) = &self.inter {
@@ -193,88 +262,86 @@ impl<'a> ChloeManager<'a> {
 		}
 	}
 	pub async fn process_msg(&self, msg: Message, ctx: serenity::client::Context, db: Arc<Mutex<Database>>, prefix: &str) -> Option<Result<(), CommErr>> {
-		if let Some(arg_str) = msg.content.clone().strip_prefix(prefix) {
-			let args: Vec<&str> = arg_str.split(' ').collect();
-			let member = match msg.member {
-				Some(..) => {
-					msg.guild_id.clone().unwrap().member(ctx.http.as_ref(), msg.author.id).await.ok()
-				},
-				None => None
-			};
-			let author = msg.author.clone();
-			let channel_id = msg.channel_id.clone();
-			let guild_id = msg.guild_id.clone();
-			match self.run_command(args[0], CommandParams {
-				args: args.iter().map(|s| s.to_string()).collect(),
-				arg_string: args[1..].join(" "),
-				prefix: prefix.to_string(),
-				db: db,
-				ctx: ctx.clone(),
-				options: HashMap::new(),
-				msg: Some(msg),
-				inter: None,
-				author: author,
-				member: member,
-				channel_id: channel_id.clone(),
-				guild_id: guild_id
-			}).await {
-				Some(v) => Some(match v {
-					Ok(v) => match v {
-						CommRes::Text(text) => match channel_id.say(ctx.http, text).await {
-							Ok(..) => Ok(()),
-							Err(e) => Err(CommErr::Error(String::new(), format!("{e}")))
-						},
-						CommRes::Msg(msg) => match channel_id.send_message(ctx.http.as_ref(), |m| { *m = msg; m }).await {
-							Ok(..) => Ok(()),
-							Err(e) => Err(CommErr::Error(String::new(), format!("{e}")))
-						},
-						_ => Ok(())
-					},
-					Err(e) => {
-						channel_id.send_message(ctx.http.as_ref(), |m| {
-							let command = self.command(args[0]).unwrap();
-							match &e {
-								CommErr::Error(e1, e2) => {
-									if !e2.is_empty() {
-										eprintln!("Error processing message: {}", e2);
-									}
-									m.add_embed(|e| {
-										let e = e.title("Error")
-										.color(CHLOE.config["bad_color"].as_i64().unwrap() as i32);
-										if e1.is_empty() {
-											e.description("An error has occurred")
-										}
-										else {
-											e.description(e1)
-										}
-									})
-								},
-								CommErr::UnknownError => m.add_embed(|e| {
-									e.title("Error")
-									.color(CHLOE.config["bad_color"].as_i64().unwrap() as i32)
-									.description("An error has occurred")
-								}),
-								CommErr::SyntaxError => 
-									m.add_embed(|e| {
-									e.title(format!("{}{}", prefix, command.names[0]))
-									.description(command.desc.clone())
-									.fields(vec![("Syntax", format!("{}{} {}", prefix, command.names[0], command.args), false)])
-									.color(CHLOE.config["embed_color"].as_i64().unwrap() as i32)
-								}),
-								CommErr::UnknownCommand => m.content("Unknown command")
-							}
-						}).await.ok();
-						Err(e)
-					}
-				}),
-				None => {
-					channel_id.say(ctx.http.as_ref(), "Unknown command").await.ok();
-					None
-				}
-			}
+		let content = msg.content.clone();
+		if content.len() <= prefix.len() || prefix != &content.as_str()[0..prefix.len()].to_lowercase() {
+			return None;
 		}
-		else {
-			None
+		let arg_str = &content.as_str()[prefix.len()..];
+		let args: Vec<&str> = arg_str.split(' ').collect();
+		let member = match msg.member {
+			Some(..) => {
+				msg.guild_id.clone().unwrap().member(ctx.http.as_ref(), msg.author.id).await.ok()
+			},
+			None => None
+		};
+		let author = msg.author.clone();
+		let channel_id = msg.channel_id.clone();
+		let guild_id = msg.guild_id.clone();
+		match self.run_command(args[0], CommandParams {
+			prefix: prefix.to_string(),
+			db: db,
+			ctx: ctx.clone(),
+			options: CommOptions(HashMap::new()),
+			msg: Some(msg),
+			inter: None,
+			author: author,
+			member: member,
+			channel_id: channel_id.clone(),
+			guild_id: guild_id
+		}).await {
+			Some(v) => Some(match v {
+				Ok(v) => match v {
+					CommRes::Text(text) => match channel_id.say(ctx.http, text).await {
+						Ok(..) => Ok(()),
+						Err(e) => Err(CommErr::Error(String::new(), format!("{e}")))
+					},
+					CommRes::Msg(msg) => match channel_id.send_message(ctx.http.as_ref(), |m| { *m = msg; m }).await {
+						Ok(..) => Ok(()),
+						Err(e) => Err(CommErr::Error(String::new(), format!("{e}")))
+					},
+					_ => Ok(())
+				},
+				Err(e) => {
+					channel_id.send_message(ctx.http.as_ref(), |m| {
+						let command = self.command(args[0]).unwrap();
+						match &e {
+							CommErr::Error(e1, e2) => {
+								if !e2.is_empty() {
+									eprintln!("Error processing message: {}", e2);
+								}
+								m.add_embed(|e| {
+									let e = e.title("Error")
+									.color(CHLOE.config["bad_color"].as_i64().unwrap() as i32);
+									if e1.is_empty() {
+										e.description("An error has occurred")
+									}
+									else {
+										e.description(e1)
+									}
+								})
+							},
+							CommErr::UnknownError => m.add_embed(|e| {
+								e.title("Error")
+								.color(CHLOE.config["bad_color"].as_i64().unwrap() as i32)
+								.description("An error has occurred")
+							}),
+							CommErr::SyntaxError => 
+								m.add_embed(|e| {
+								e.title(format!("{}{}", prefix, command.names[0]))
+								.description(command.desc.clone())
+								.fields(vec![("Syntax", format!("{}{} {}", prefix, command.names[0], command.args), false)])
+								.color(CHLOE.config["embed_color"].as_i64().unwrap() as i32)
+							}),
+							CommErr::UnknownCommand => m.content("Unknown command")
+						}
+					}).await.ok();
+					Err(e)
+				}
+			}),
+			None => {
+				channel_id.say(ctx.http.as_ref(), "Unknown command").await.ok();
+				Some(Err(CommErr::UnknownCommand))
+			}
 		}
 	}
 	pub async fn process_inter(&self, inter: ApplicationCommandInteraction, ctx: serenity::client::Context, db: Arc<Mutex<Database>>) -> Option<Result<(), CommErr>> {
@@ -289,12 +356,10 @@ impl<'a> ChloeManager<'a> {
 		let channel_id = inter.channel_id.clone();
 		let guild_id = inter.guild_id.clone();
 		match CHLOE.run_command(inter.data.name.clone().as_str(), CommandParams {
-			args: Vec::new(),
-			arg_string: String::new(),
 			prefix: "/".to_string(),
 			db: db,
 			ctx: ctx.clone(),
-			options: CommOptions::new(inter.data.options.clone()).0,
+			options: CommOptions::new(inter.data.options.clone()),
 			msg: None,
 			inter: Some(inter.clone()),
 			author: author,
@@ -360,7 +425,7 @@ impl<'a> ChloeManager<'a> {
 				inter.create_followup_message(ctx.http.as_ref(), |m| {
 					m.content("Unknown command")
 				}).await.ok();
-				None
+				Some(Err(CommErr::UnknownCommand))
 			}
 		}
 	}

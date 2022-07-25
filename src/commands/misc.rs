@@ -118,7 +118,7 @@ pub fn commands<'a>() -> Vec<Command<'a>> {
 			}],
 			cat: category.clone(),
 			func: |params: CommandParams| func!({
-				let text = handle_syntax_opt!(params.get_option_string("text"));
+				let text = handle_syntax_opt!(params.options.get_string("text"));
 				Ok(CommRes::Text(text))
 			}),
 			..Command::new()
@@ -133,10 +133,25 @@ pub fn commands<'a>() -> Vec<Command<'a>> {
 			}],
 			cat: category.clone(),
 			func: |params: CommandParams| func!({
-				let text = handle_syntax_opt!(params.get_option_string("text"));
+				let text = handle_syntax_opt!(params.options.get_string("text"));
 				Err(error!(text))
 			}),
 			..Command::new()
-		}
+		},
+		// love
+		Command {
+			names: svec!["love"],
+			desc: "Love someone".to_string(),
+			options: vec![|option| {
+				option.name("who").kind(CommandOptionType::User).required(true)
+					.description("User you want to love")
+			}],
+			cat: category.clone(),
+			func: |params: CommandParams| func!({
+				let who = handle_syntax_opt!(params.options.get_user("who"));
+				Ok(CommRes::Text(format!("{} loves {} :two_hearts:", params.author.name, who.0.name)))
+			}),
+			..Command::new()
+		},
 	]
 }
