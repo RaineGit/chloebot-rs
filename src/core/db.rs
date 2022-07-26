@@ -107,19 +107,22 @@ impl Database {
 		writeln!(&mut self.db_tmp_file, "{}", serde_json::to_string(&serde_json::json!([path.to_vec(), value])).unwrap()).unwrap();
 		Ok(())
 	}
-	pub fn get(&mut self, path: &[&str]) -> Result<&Value, ()> {
+	pub fn get(&mut self, path: &[&str]) -> &Value {
 		let mut data = &self.data;
 		for key in path {
 			if data.get(key).is_some() {
 				data = match data.is_object() {
-					true => data.get(key).unwrap(),
-					false => return Err(())
+					true => match data.get(key) {
+						Some(v) => v,
+						None => &Value::Null
+					},
+					false => return &Value::Null
 				};
 			}
 			else {
-				return Ok(&Value::Null);
+				return &Value::Null;
 			}
 		}
-		Ok(data)
+		data
 	}
 }

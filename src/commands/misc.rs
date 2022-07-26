@@ -23,10 +23,7 @@ pub fn commands<'a>() -> Vec<Command<'a>> {
 			func: |params: CommandParams| func!({
 				let count = {
 					let db = &mut params.db.lock().unwrap();
-					let count = match db.get(&["pings"]).unwrap() {
-						Value::Number(num) => num.as_u64().unwrap(),
-						_ => 0
-					} + 1;
+					let count = handle_opt!(db.get(&["pings"]).as_i64()) + 1;
 					db.set(&["pings"], count.into()).unwrap();
 					count
 				};
