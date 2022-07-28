@@ -22,7 +22,7 @@ pub fn commands<'a>() -> Vec<Command<'a>> {
 			cat: category.clone(),
 			func: |params: CommandParams| func!({
 				let count = {
-					let db = &mut params.db.lock().unwrap();
+					let db = &mut params.db.write().unwrap();
 					let count = match db.get(&["pings"]) {
 						Value::Number(num) => handle_opt!(num.as_u64()),
 						Value::Null | _ => 0

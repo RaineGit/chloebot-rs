@@ -4,7 +4,7 @@ use std::io::Read;
 use std::path::Path;
 use std::collections::HashMap;
 use db::Database;
-use std::sync::{Mutex, Arc};
+use std::sync::{RwLock, Arc};
 use std::pin::Pin;
 use std::future::Future;
 use serde_json::Value;
@@ -140,7 +140,7 @@ impl CommOptions {
 
 pub struct CommandParams {
 	pub prefix: String,
-	pub db: Arc<Mutex<Database>>,
+	pub db: Arc<RwLock<Database>>,
 	pub ctx: serenity::client::Context,
 	pub options: CommOptions,
 	pub msg: Option<Message>,
@@ -261,9 +261,9 @@ impl<'a> ChloeManager<'a> {
 			None => None
 		}
 	}
-	pub async fn process_msg(&self, msg: Message, ctx: serenity::client::Context, db: Arc<Mutex<Database>>, prefix: &str) -> Option<Result<(), CommErr>> {
+	pub async fn process_msg(&self, msg: Message, ctx: serenity::client::Context, db: Arc<RwLock<Database>>, prefix: &str) -> Option<Result<(), CommErr>> {
 		let content = msg.content.clone();
-		if content.len() <= prefix.len() || prefix != &content.as_str()[0..prefix.len()].to_lowercase() {
+		if content.len() < prefix.len() || prefix != &content.as_str()[0..prefix.len()].to_lowercase() {
 			return None;
 		}
 		let arg_str = &content.as_str()[prefix.len()..];
@@ -344,7 +344,7 @@ impl<'a> ChloeManager<'a> {
 			}
 		}
 	}
-	pub async fn process_inter(&self, inter: ApplicationCommandInteraction, ctx: serenity::client::Context, db: Arc<Mutex<Database>>) -> Option<Result<(), CommErr>> {
+	pub async fn process_inter(&self, inter: ApplicationCommandInteraction, ctx: serenity::client::Context, db: Arc<RwLock<Database>>) -> Option<Result<(), CommErr>> {
 		inter.defer(ctx.http.as_ref()).await.unwrap();
 		let member = match inter.member {
 			Some(..) => {

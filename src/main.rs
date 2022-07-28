@@ -1,6 +1,6 @@
 use db::Database;
 use std::env;
-use std::sync::{Mutex, Arc};
+use std::sync::{RwLock, Arc};
 use serenity::async_trait;
 use serenity::prelude::*;
 use serenity::model::channel::Message;
@@ -17,7 +17,7 @@ lazy_static! {
 		Some("config.json5"),
 		commands::commands()
 	).unwrap();
-	static ref DB: Arc<Mutex<Database>> = Arc::new(Mutex::new(Database::open("db").unwrap()));
+	static ref DB: Arc<RwLock<Database>> = Arc::new(RwLock::new(Database::open("db").unwrap()));
 }
 
 struct Handler;
